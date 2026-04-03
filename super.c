@@ -1255,6 +1255,9 @@ static void parse_options_set_flags(struct super_block *sb, struct apfs_sb_info 
 /*
  * Many of the parse_options() functions in other file systems return 0
  * on error. This one returns an error code, and 0 on success.
+ *
+ * Note that even on failure, the caller is responsible for freeing all
+ * superblock fields.
  */
 static int parse_options(struct apfs_sb_info *sbi, char *options)
 {
@@ -1264,6 +1267,9 @@ static int parse_options(struct apfs_sb_info *sbi, char *options)
 	int err = 0;
 
 	/* Set default values before parsing */
+	sbi->s_vol_nr = 0;
+	sbi->s_snap_name = NULL;
+	sbi->s_tier2_path = NULL;
 	sbi->s_mount_opt = 0;
 
 #ifdef CONFIG_APFS_RW_ALWAYS
@@ -1319,16 +1325,26 @@ static int parse_options(struct apfs_sb_info *sbi, char *options)
 			}
 			break;
 		case Opt_vol:
+			err = match_int(&args[0], &sbi->s_vol_nr);
+			if (err) {
+				apfs_err(NULL, "invalid volume number");
+				return -EINVAL;
+			}
+			break;
 		case Opt_snap:
+			kfree(sbi->s_snap_name);
+			sbi->s_snap_name = match_strdup(&args[0]);
+			if (!sbi->s_snap_name)
+				return -ENOMEM;
+			break;
 		case Opt_tier2:
-			/* Already read early on mount */
+			kfree(sbi->s_tier2_path);
+			sbi->s_tier2_path = match_strdup(&args[0]);
+			if (!sbi->s_tier2_path)
+				return -ENOMEM;
 			break;
 		default:
-			/*
-			 * We should have already checked the mount options in
-			 * apfs_preparse_options(), so this is a bug.
-			 */
-			apfs_alert(NULL, "invalid mount option %s", p);
+			apfs_warn(NULL, "invalid mount option %s", p);
 			return -EINVAL;
 		}
 	}
@@ -1876,81 +1892,6 @@ out:
 	return ret;
 }
 
-/**
- * apfs_preparse_options - Parse the options used to identify a superblock
- * @sbi:	superblock info
- * @options:	options string to parse
- *
- * Returns 0 on success, or a negative error code in case of failure. Even on
- * failure, the caller is responsible for freeing all superblock fields.
- */
-static int apfs_preparse_options(struct apfs_sb_info *sbi, char *options)
-{
-	char *tofree = NULL;
-	char *p;
-	substring_t args[MAX_OPT_ARGS];
-	int err = 0;
-
-	/* Set default values before parsing */
-	sbi->s_vol_nr = 0;
-	sbi->s_snap_name = NULL;
-	sbi->s_tier2_path = NULL;
-
-	if (!options)
-		return 0;
-
-	/* Later parse_options() will need the unmodified options string */
-	options = kstrdup(options, GFP_KERNEL);
-	if (!options)
-		return -ENOMEM;
-	tofree = options;
-
-	while ((p = strsep(&options, ",")) != NULL) {
-		int token;
-
-		if (!*p)
-			continue;
-		token = match_token(p, tokens, args);
-		switch (token) {
-		case Opt_vol:
-			err = match_int(&args[0], &sbi->s_vol_nr);
-			if (err)
-				goto out;
-			break;
-		case Opt_snap:
-			kfree(sbi->s_snap_name);
-			sbi->s_snap_name = match_strdup(&args[0]);
-			if (!sbi->s_snap_name) {
-				err = -ENOMEM;
-				goto out;
-			}
-			break;
-		case Opt_tier2:
-			kfree(sbi->s_tier2_path);
-			sbi->s_tier2_path = match_strdup(&args[0]);
-			if (!sbi->s_tier2_path) {
-				err = -ENOMEM;
-				goto out;
-			}
-			break;
-		case Opt_readwrite:
-		case Opt_cknodes:
-		case Opt_uid:
-		case Opt_gid:
-			/* Not needed for sget(), will be read later */
-			break;
-		default:
-			apfs_warn(NULL, "invalid mount option %s", p);
-			err = -EINVAL;
-			goto out;
-		}
-	}
-	err = 0;
-out:
-	kfree(tofree);
-	return err;
-}
-
 /*
  * This function is a copy of mount_bdev() that allows multiple mounts.
  */
@@ -1983,11 +1924,7 @@ static struct dentry *apfs_mount(struct file_system_type *fs_type, int flags,
 	sbi = kzalloc(sizeof(*sbi), GFP_KERNEL);
 	if (!sbi)
 		return ERR_PTR(-ENOMEM);
-
 	/* Set up the fields that sget() will need to id the superblock */
-	error = apfs_preparse_options(sbi, data);
-	if (error)
-		goto out_free_sbi;
 	error = parse_options(sbi, data);
 	if (error)
 		goto out_free_sbi;
@@ -2190,12 +2127,7 @@ static void apfs_free_fc(struct fs_context *fc)
 
 static int apfs_parse_monolithic(struct fs_context *fc, void *data)
 {
-	struct apfs_sb_info *sbi = fc->s_fs_info;
-	int result = apfs_preparse_options(sbi, data);
-
-	if (result)
-		return result;
-	return parse_options(sbi, data);
+	return parse_options(fc->s_fs_info, data);
 }
 
 static const struct fs_context_operations apfs_context_ops = {
