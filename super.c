@@ -1259,7 +1259,7 @@ static void parse_options_set_flags(struct super_block *sb, struct apfs_sb_info 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(7, 0, 0)
 static int parse_options(struct fs_context *fc, char *options)
 {
-    struct apfs_sb_info *sbi = fc->s_fs_info;
+	struct apfs_sb_info *sbi = fc->s_fs_info;
 #else
 static int parse_options(struct super_block *sb, char *options)
 {
@@ -2209,10 +2209,10 @@ static int apfs_parse_monolithic(struct fs_context *fc, void *data)
 }
 
 static const struct fs_context_operations apfs_context_ops = {
-	.get_tree    = apfs_get_tree,
-	.reconfigure = apfs_reconfigure,
-	.free        = apfs_free_fc,
-	.parse_monolithic = apfs_parse_monolithic,
+	.get_tree		= apfs_get_tree,
+	.reconfigure		= apfs_reconfigure,
+	.free			= apfs_free_fc,
+	.parse_monolithic	= apfs_parse_monolithic,
 };
 
 static int apfs_init_fs_context(struct fs_context *fc)
