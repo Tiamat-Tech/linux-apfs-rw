@@ -1269,21 +1269,20 @@ static int parse_options(struct super_block *sb, char *options)
 	substring_t args[MAX_OPT_ARGS];
 	int option;
 	int err = 0;
-	unsigned int nx_flags;
 
 	/* Set default values before parsing */
-	nx_flags = 0;
+	sbi->s_mount_opt = 0;
 
 #ifdef CONFIG_APFS_RW_ALWAYS
 	/* Still risky, but some packagers want writable mounts by default */
-	nx_flags |= APFS_READWRITE;
+	sbi->s_mount_opt |= APFS_READWRITE;
 #endif
 
 	sbi->s_uid = INVALID_UID;
 	sbi->s_gid = INVALID_GID;
 
 	if (!options)
-		goto out;
+		return 0;
 
 	while ((p = strsep(&options, ",")) != NULL) {
 		int token;
@@ -1297,14 +1296,14 @@ static int parse_options(struct super_block *sb, char *options)
 			 * Write support is not safe yet, so keep it disabled
 			 * unless the user requests it explicitly.
 			 */
-			nx_flags |= APFS_READWRITE;
+			sbi->s_mount_opt |= APFS_READWRITE;
 			break;
 		case Opt_cknodes:
 			/*
 			 * Right now, node checksums are too costly to enable
 			 * by default.  TODO: try to improve this.
 			 */
-			nx_flags |= APFS_CHECK_NODES;
+			sbi->s_mount_opt |= APFS_CHECK_NODES;
 			break;
 		case Opt_uid:
 			err = match_int(&args[0], &option);
@@ -1340,9 +1339,6 @@ static int parse_options(struct super_block *sb, char *options)
 			return -EINVAL;
 		}
 	}
-
-out:
-	sbi->s_mount_opt = nx_flags;
 	return 0;
 }
 
