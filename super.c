@@ -1256,15 +1256,8 @@ static void parse_options_set_flags(struct super_block *sb, struct apfs_sb_info 
  * Many of the parse_options() functions in other file systems return 0
  * on error. This one returns an error code, and 0 on success.
  */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(7, 0, 0)
-static int parse_options(struct fs_context *fc, char *options)
+static int parse_options(struct apfs_sb_info *sbi, char *options)
 {
-	struct apfs_sb_info *sbi = fc->s_fs_info;
-#else
-static int parse_options(struct super_block *sb, char *options)
-{
-	struct apfs_sb_info *sbi = APFS_SB(sb);
-#endif
 	char *p;
 	substring_t args[MAX_OPT_ARGS];
 	int option;
@@ -1572,7 +1565,7 @@ static int apfs_fill_super(struct super_block *sb, void *data, int silent)
 		goto failed_volume;
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(7, 0, 0)
-	err = parse_options(sb, data);
+	err = parse_options(sbi, data);
 	if (err)
 		goto failed_volume;
 #endif
@@ -2001,6 +1994,7 @@ static struct dentry *apfs_mount(struct file_system_type *fs_type, int flags,
 	error = apfs_preparse_options(sbi, data);
 	if (error)
 		goto out_free_sbi;
+
 #endif
 
 	/* Make sure that snapshots are mounted read-only */
@@ -2205,7 +2199,7 @@ static int apfs_parse_monolithic(struct fs_context *fc, void *data)
 
 	if (result)
 		return result;
-	return parse_options(fc, data);
+	return parse_options(sbi, data);
 }
 
 static const struct fs_context_operations apfs_context_ops = {
