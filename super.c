@@ -1563,12 +1563,6 @@ static int apfs_fill_super(struct super_block *sb, void *data, int silent)
 	err = apfs_setup_bdi(sb);
 	if (err)
 		goto failed_volume;
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(7, 0, 0)
-	err = parse_options(sbi, data);
-	if (err)
-		goto failed_volume;
-#endif
 	parse_options_set_flags(sb, sbi, sbi->s_mount_opt);
 
 	err = apfs_map_volume_super(sb, false /* write */);
@@ -1994,7 +1988,9 @@ static struct dentry *apfs_mount(struct file_system_type *fs_type, int flags,
 	error = apfs_preparse_options(sbi, data);
 	if (error)
 		goto out_free_sbi;
-
+	error = parse_options(sbi, data);
+	if (error)
+		goto out_free_sbi;
 #endif
 
 	/* Make sure that snapshots are mounted read-only */
