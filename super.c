@@ -1279,10 +1279,8 @@ static int parse_options(struct super_block *sb, char *options)
 	nx_flags |= APFS_READWRITE;
 #endif
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(7, 0, 0)
 	sbi->s_uid = INVALID_UID;
 	sbi->s_gid = INVALID_GID;
-#endif
 
 	if (!options)
 		goto out;
@@ -1584,8 +1582,6 @@ static int apfs_fill_super(struct super_block *sb, void *data, int silent)
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(7, 0, 0)
 	parse_options_set_flags(sb, sbi, sbi->s_mount_opt);
 #else
-	sbi->s_uid = INVALID_UID;
-	sbi->s_gid = INVALID_GID;
 	err = parse_options(sb, data);
 	if (err)
 		goto failed_volume;
