@@ -1342,11 +1342,7 @@ static int parse_options(struct super_block *sb, char *options)
 	}
 
 out:
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(7, 0, 0)
 	sbi->s_mount_opt = nx_flags;
-#else
-	parse_options_set_flags(sb, sbi, nx_flags);
-#endif
 	return 0;
 }
 
@@ -1579,13 +1575,13 @@ static int apfs_fill_super(struct super_block *sb, void *data, int silent)
 	if (err)
 		goto failed_volume;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(7, 0, 0)
-	parse_options_set_flags(sb, sbi, sbi->s_mount_opt);
-#else
+#if LINUX_VERSION_CODE < KERNEL_VERSION(7, 0, 0)
 	err = parse_options(sb, data);
 	if (err)
 		goto failed_volume;
 #endif
+	parse_options_set_flags(sb, sbi, sbi->s_mount_opt);
+
 	err = apfs_map_volume_super(sb, false /* write */);
 	if (err)
 		goto failed_volume;
