@@ -2034,9 +2034,7 @@ out_unmap_super:
 	apfs_free_main_super(sbi);
 #endif
 out_free_sbi:
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(7, 0, 0)
-	return error;
-#else
+#if LINUX_VERSION_CODE < KERNEL_VERSION(7, 0, 0)
 	kfree(sbi->s_snap_name);
 	kfree(sbi->s_tier2_path);
 	kfree(sbi);
