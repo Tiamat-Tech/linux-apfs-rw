@@ -1252,6 +1252,24 @@ static void parse_options_set_flags(struct super_block *sb, struct apfs_sb_info 
 	}
 }
 
+/**
+ * apfs_set_default_opts - Set the default mount options in the superblock
+ * @sbi: in-memory superblock info
+ */
+static void apfs_set_default_opts(struct apfs_sb_info *sbi)
+{
+	sbi->s_vol_nr = 0;
+	sbi->s_snap_name = NULL;
+	sbi->s_tier2_path = NULL;
+	sbi->s_mount_opt = 0;
+#ifdef CONFIG_APFS_RW_ALWAYS
+	/* Still risky, but some packagers want writable mounts by default */
+	sbi->s_mount_opt |= APFS_READWRITE;
+#endif
+	sbi->s_uid = INVALID_UID;
+	sbi->s_gid = INVALID_GID;
+}
+
 /*
  * Many of the parse_options() functions in other file systems return 0
  * on error. This one returns an error code, and 0 on success.
@@ -1266,20 +1284,7 @@ static int parse_options(struct apfs_sb_info *sbi, char *options)
 	int option;
 	int err = 0;
 
-	/* Set default values before parsing */
-	sbi->s_vol_nr = 0;
-	sbi->s_snap_name = NULL;
-	sbi->s_tier2_path = NULL;
-	sbi->s_mount_opt = 0;
-
-#ifdef CONFIG_APFS_RW_ALWAYS
-	/* Still risky, but some packagers want writable mounts by default */
-	sbi->s_mount_opt |= APFS_READWRITE;
-#endif
-
-	sbi->s_uid = INVALID_UID;
-	sbi->s_gid = INVALID_GID;
-
+	apfs_set_default_opts(sbi);
 	if (!options)
 		return 0;
 
