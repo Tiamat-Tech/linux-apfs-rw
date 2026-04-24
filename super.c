@@ -17,6 +17,7 @@
 #include "version.h"
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(7, 0, 0)
 #include <linux/fs_context.h>
+#include <linux/fs_parser.h>
 #endif
 
 #define APFS_MODULE_ID_STRING	"linux-apfs by eafer (" GIT_COMMIT ")"
@@ -1203,6 +1204,7 @@ enum {
 	Opt_readwrite, Opt_cknodes, Opt_uid, Opt_gid, Opt_vol, Opt_snap, Opt_tier2, Opt_err,
 };
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(7, 0, 0)
 static const match_table_t tokens = {
 	{Opt_readwrite, "readwrite"},
 	{Opt_cknodes, "cknodes"},
@@ -1213,6 +1215,18 @@ static const match_table_t tokens = {
 	{Opt_tier2, "tier2=%s"},
 	{Opt_err, NULL}
 };
+#else
+static const struct fs_parameter_spec apfs_param_spec[] = {
+	fsparam_flag	("readwrite",	Opt_readwrite),
+	fsparam_flag	("cknodes",	Opt_cknodes),
+	fsparam_uid	("uid",		Opt_uid),
+	fsparam_gid	("gid",		Opt_gid),
+	fsparam_u32	("vol",		Opt_vol),
+	fsparam_string	("snap",	Opt_snap),
+	fsparam_string	("tier2",	Opt_tier2),
+	{}
+};
+#endif
 
 /**
  * apfs_set_nx_flags - Set the mount flags for the container, if allowed
@@ -1269,6 +1283,8 @@ static void apfs_set_default_opts(struct apfs_sb_info *sbi)
 	sbi->s_uid = INVALID_UID;
 	sbi->s_gid = INVALID_GID;
 }
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(7, 0, 0)
 
 /*
  * Many of the parse_options() functions in other file systems return 0
@@ -1354,6 +1370,62 @@ static int parse_options(struct apfs_sb_info *sbi, char *options)
 	}
 	return 0;
 }
+
+#else /* LINUX_VERSION_CODE < KERNEL_VERSION(7, 0, 0) */
+
+static int apfs_parse_param(struct fs_context *fc, struct fs_parameter *param)
+{
+	struct apfs_sb_info *sbi = fc->s_fs_info;
+	int opt;
+	struct fs_parse_result result;
+
+	opt = fs_parse(fc, apfs_param_spec, param, &result);
+	if (opt < 0)
+		return opt;
+
+	switch (opt) {
+	case Opt_readwrite:
+		/*
+		 * Write support is not safe yet, so keep it disabled
+		 * unless the user requests it explicitly.
+		 */
+		sbi->s_mount_opt |= APFS_READWRITE;
+		break;
+	case Opt_cknodes:
+		/*
+		 * Right now, node checksums are too costly to enable
+		 * by default.  TODO: try to improve this.
+		 */
+		sbi->s_mount_opt |= APFS_CHECK_NODES;
+		break;
+	case Opt_uid:
+		sbi->s_uid = result.uid;
+		break;
+	case Opt_gid:
+		sbi->s_gid = result.gid;
+		break;
+	case Opt_vol:
+		sbi->s_vol_nr = result.uint_32;
+		break;
+	case Opt_snap:
+		kfree(sbi->s_snap_name);
+		sbi->s_snap_name = kstrdup(param->string, GFP_KERNEL);
+		if (!sbi->s_snap_name)
+			return -ENOMEM;
+		break;
+	case Opt_tier2:
+		kfree(sbi->s_tier2_path);
+		sbi->s_tier2_path = kstrdup(param->string, GFP_KERNEL);
+		if (!sbi->s_tier2_path)
+			return -ENOMEM;
+		break;
+	default:
+		return -EINVAL;
+	}
+	return 0;
+}
+
+#endif
 
 /**
  * apfs_check_nx_features - Check for unsupported features in the container
@@ -2128,16 +2200,11 @@ static void apfs_free_fc(struct fs_context *fc)
 	}
 }
 
-static int apfs_parse_monolithic(struct fs_context *fc, void *data)
-{
-	return parse_options(fc->s_fs_info, data);
-}
-
 static const struct fs_context_operations apfs_context_ops = {
 	.get_tree		= apfs_get_tree,
 	.reconfigure		= apfs_reconfigure,
 	.free			= apfs_free_fc,
-	.parse_monolithic	= apfs_parse_monolithic,
+	.parse_param		= apfs_parse_param,
 };
 
 static int apfs_init_fs_context(struct fs_context *fc)
