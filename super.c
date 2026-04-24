@@ -1284,7 +1284,6 @@ static int parse_options(struct apfs_sb_info *sbi, char *options)
 	int option;
 	int err = 0;
 
-	apfs_set_default_opts(sbi);
 	if (!options)
 		return 0;
 
@@ -1929,6 +1928,7 @@ static struct dentry *apfs_mount(struct file_system_type *fs_type, int flags,
 	sbi = kzalloc(sizeof(*sbi), GFP_KERNEL);
 	if (!sbi)
 		return ERR_PTR(-ENOMEM);
+	apfs_set_default_opts(sbi);
 	/* Set up the fields that sget() will need to id the superblock */
 	error = parse_options(sbi, data);
 	if (error)
@@ -2148,6 +2148,7 @@ static int apfs_init_fs_context(struct fs_context *fc)
 	sbi = kzalloc(sizeof(*sbi), GFP_KERNEL);
 	if (!sbi)
 		return -ENOMEM;
+	apfs_set_default_opts(sbi);
 
 	fc->s_fs_info = sbi;
 	fc->ops = &apfs_context_ops;
